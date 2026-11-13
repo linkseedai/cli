@@ -1,0 +1,12 @@
+bin/
+node_modules/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+.env.*
+config.toml
+*.pem
+*.key
+*.p12

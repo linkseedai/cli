@@ -1,0 +1,35 @@
+{
+  "name": "@linkseed/cli",
+  "version": "0.1.0",
+  "description": "Command line client for the Linkseed API",
+  "bin": {
+    "linkseed": "scripts/run.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/install.js"
+  },
+  "files": [
+    "scripts/run.js",
+    "scripts/install.js",
+    "checksums.txt",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:linkseedai/cli.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

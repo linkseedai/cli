@@ -1,0 +1,3 @@
+# SHA-256 checksums of GitHub release archives, one per line:
+# <64 hex chars>  linkseed-<version>-<platform>-<arch>.tar.gz
+# Filled in when those archives are published. The install script rejects a download that is not listed here.

@@ -1,0 +1,1 @@
+"""Linkseed command line."""
