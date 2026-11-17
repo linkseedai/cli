@@ -27,7 +27,7 @@ def load_config() -> tuple[str | None, str | None]:
 
 
 def save_config(base_url: str, access_token: str | None) -> None:
-    """Write the config file with mode 0600. `access_token` is omitted when None."""
+    """Atomically write config (0600 on POSIX; inherited directory ACL on Windows). `access_token` is omitted when None."""
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     os.chmod(path.parent, 0o700)

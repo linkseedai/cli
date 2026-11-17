@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from typing import cast
 from urllib.parse import urlsplit
 
 import httpx
 
 JsonObject = dict[str, object]
+QueryParams = Mapping[str, str | int | Sequence[str]]
 
 
 class ApiError(Exception):
@@ -28,12 +30,16 @@ def http_client() -> httpx.Client:
     return httpx.Client(timeout=httpx.Timeout(30.0), trust_env=True, follow_redirects=False)
 
 
-def write_error(status: int | None, detail: str) -> int:
-    """Print one JSON object to stderr and return the process exit code."""
-    print(
-        json.dumps({"status": status, "detail": detail}, ensure_ascii=False),
-        file=sys.stderr,
-    )
+def write_error(status: int | None, detail: str, *, reason: str | None = None) -> int:
+    """Print one JSON object to stderr and return the process exit code.
+
+    `reason` marks an application outcome. A transport failure leaves it unset,
+    so callers can tell a generation failure from an unreachable API.
+    """
+    body: dict[str, object] = {"status": status, "detail": detail}
+    if reason is not None:
+        body["reason"] = reason
+    print(json.dumps(body, ensure_ascii=False), file=sys.stderr)
     return _exit_code(status)
 
 
@@ -44,6 +50,7 @@ def request_json(
     *,
     token: str | None = None,
     body: JsonObject | None = None,
+    params: QueryParams | None = None,
 ) -> tuple[int, object]:
     """Call the API and return the status code and JSON body. Errors raise `ApiError`."""
     _require_https_for_remote(base_url)
@@ -57,6 +64,7 @@ def request_json(
                 base_url.rstrip("/") + path,
                 headers=headers,
                 json=body,
+                params=params,
             )
     except httpx.HTTPError as exc:
         raise ApiError(None, "Could not reach the API.") from exc

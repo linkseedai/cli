@@ -12,7 +12,7 @@ from linkseed_cli.http import ApiError, JsonObject, request_json, write_error
 
 CLI_CLIENT_ID = "linkseed-cli"
 _LOGIN_PATH = "/api/v1/auth/login"
-_ME_PATH = "/api/v1/auth/me"
+_ME_PATH = "/api/v1/auth/cli/me"
 _LOGOUT_PATH = "/api/v1/auth/logout"
 
 
