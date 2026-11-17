@@ -1,4 +1,4 @@
 # SHA-256 checksums of GitHub release archives, one per line:
 # <64 hex chars>  linkseed-<version>-<platform>-<arch>.tar.gz
 # Filled in when those archives are published. The install script rejects a download that is not listed here.
-17bedb7a2ab9bdd9168e4165d3da2b1904bde0707a9d47e6bc46a8f1186f7ba5  linkseed-0.1.0-alpha-darwin-arm64.tar.gz
+d4f73a1c8b8c246a5e9dbdc47c9c11eb2e419944c14dd73f0ff1d9b8d18d5ac0  linkseed-0.1.0-alpha-darwin-arm64.tar.gz
