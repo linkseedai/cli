@@ -4,7 +4,7 @@
 set -eu
 
 REPO="linkseedai/cli"
-VERSION="0.1.0"
+VERSION="0.1.0-alpha"
 
 if [ "$VERSION" = "__VERSION__" ]; then
   echo "This installer has no version. Use the copy exported to GitHub." >&2

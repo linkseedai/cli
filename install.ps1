@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $Repo = "linkseedai/cli"
-$Version = "0.1.0"
+$Version = "0.1.0-alpha"
 if ($Version -eq "__VERSION__") {
   throw "This installer has no version. Use the copy exported to GitHub."
 }
