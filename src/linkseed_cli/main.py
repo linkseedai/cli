@@ -6,8 +6,15 @@ import argparse
 import sys
 from typing import cast
 
-from linkseed_cli.activities import edit_evaluation, generate_evaluation, list_activities, show_activity
+from linkseed_cli.activities import (
+    edit_evaluation,
+    export_activity,
+    generate_evaluation,
+    list_activities,
+    show_activity,
+)
 from linkseed_cli.commands import login, logout, whoami
+from linkseed_cli.course import create_course, relearn_course, snap_image
 from linkseed_cli.http import write_error
 
 
@@ -55,6 +62,10 @@ def run(argv: list[str]) -> int:
     _ = show_parser.add_argument("--offset", type=int)
     _ = show_parser.add_argument("--json", action="store_true")
 
+    export_parser = activity_commands.add_parser("export")
+    _ = export_parser.add_argument("activity_id", type=int)
+    _ = export_parser.add_argument("--out")
+
     evaluation = activity_commands.add_parser("evaluation")
     evaluation_commands = evaluation.add_subparsers(dest="evaluation_command", required=True)
     generate_parser = evaluation_commands.add_parser("generate")
@@ -66,10 +77,36 @@ def run(argv: list[str]) -> int:
     _ = edit_parser.add_argument("--file")
     _ = edit_parser.add_argument("--json", action="store_true")
 
+    course = commands.add_parser("course")
+    course_commands = course.add_subparsers(dest="course_command", required=True)
+    snap_parser = course_commands.add_parser("snap")
+    _ = snap_parser.add_argument("image")
+    _ = snap_parser.add_argument("--out")
+    _ = snap_parser.add_argument("--create", action="store_true", dest="create_course")
+    _ = snap_parser.add_argument("--yes", action="store_true")
+    _ = snap_parser.add_argument("--course-mode")
+    _ = snap_parser.add_argument("--teaching-mode")
+    _ = snap_parser.add_argument("--grade-level")
+    _ = snap_parser.add_argument("--topic-strategy-id")
+    _ = snap_parser.add_argument("--json", action="store_true")
+    create_parser = course_commands.add_parser("create")
+    _ = create_parser.add_argument("--question-file")
+    _ = create_parser.add_argument("--learning-plan-id", type=int)
+    _ = create_parser.add_argument("--course-mode")
+    _ = create_parser.add_argument("--teaching-mode")
+    _ = create_parser.add_argument("--grade-level")
+    _ = create_parser.add_argument("--topic-strategy-id")
+    _ = create_parser.add_argument("--json", action="store_true")
+    relearn_parser = course_commands.add_parser("relearn")
+    _ = relearn_parser.add_argument("course_id", type=int)
+    _ = relearn_parser.add_argument("--json", action="store_true")
+
     args = parser.parse_args(argv)
     command = cast_command(getattr(args, "command", None))
     if command == "activities":
         return _run_activity(args)
+    if command == "course":
+        return _run_course(args)
     if command != "auth":
         parser.error(f"unknown command {command}")
     auth_command = cast_command(getattr(args, "auth_command", None))
@@ -125,6 +162,8 @@ def _run_activity(args: argparse.Namespace) -> int:
             offset=offset,
             as_json=bool(getattr(args, "json", False)),
         )
+    if activity_command == "export":
+        return export_activity(activity_id, out_path=_optional_str(getattr(args, "out", None)))
     if activity_command == "evaluation":
         evaluation_command = cast_command(getattr(args, "evaluation_command", None))
         if evaluation_command == "generate":
@@ -140,6 +179,42 @@ def _run_activity(args: argparse.Namespace) -> int:
                 as_json=bool(getattr(args, "json", False)),
             )
     raise SystemExit(f"unknown activity command {activity_command}")
+
+
+def _run_course(args: argparse.Namespace) -> int:
+    course_command = cast_command(getattr(args, "course_command", None))
+    as_json = bool(getattr(args, "json", False))
+    if course_command == "snap":
+        image = _optional_str(getattr(args, "image", None))
+        if image is None:
+            return write_error(None, "Image path is required.")
+        return snap_image(
+            image,
+            out_path=_optional_str(getattr(args, "out", None)),
+            create=bool(getattr(args, "create_course", False)),
+            assume_yes=bool(getattr(args, "yes", False)),
+            course_mode=_optional_str(getattr(args, "course_mode", None)),
+            teaching_mode=_optional_str(getattr(args, "teaching_mode", None)),
+            grade_level=_optional_str(getattr(args, "grade_level", None)),
+            topic_strategy_id=_optional_str(getattr(args, "topic_strategy_id", None)),
+            as_json=as_json,
+        )
+    if course_command == "create":
+        return create_course(
+            question_file=_optional_str(getattr(args, "question_file", None)),
+            learning_plan_id=_optional_int(getattr(args, "learning_plan_id", None)),
+            course_mode=_optional_str(getattr(args, "course_mode", None)),
+            teaching_mode=_optional_str(getattr(args, "teaching_mode", None)),
+            grade_level=_optional_str(getattr(args, "grade_level", None)),
+            topic_strategy_id=_optional_str(getattr(args, "topic_strategy_id", None)),
+            as_json=as_json,
+        )
+    if course_command == "relearn":
+        course_id = _optional_int(getattr(args, "course_id", None))
+        if course_id is None:
+            return write_error(None, "Course id is required.")
+        return relearn_course(course_id, as_json=as_json)
+    raise SystemExit(f"unknown course command {course_command}")
 
 
 def cast_command(value: object) -> str:

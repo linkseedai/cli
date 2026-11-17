@@ -13,6 +13,7 @@ from linkseed_cli.http import ApiError, JsonObject, request_json, write_error
 
 _POLL_SECONDS = 2.0
 _POLL_LIMIT_SECONDS = 11 * 60
+_EXPORT_PAGE_SIZE = 100
 
 
 def list_activities(
@@ -96,6 +97,31 @@ def _show_messages(
         _print_json(payload)
         return 0
     _print_messages(payload)
+    return 0
+
+
+def export_activity(activity_id: int, *, out_path: str | None) -> int:
+    """Write one course as Markdown: status, evaluation, and every message."""
+    try:
+        _status, activity = _request("GET", f"/api/v1/me/activities/{activity_id}")
+    except ApiError as exc:
+        return write_error(exc.status, exc.detail)
+    detail = _dict(activity)
+    if detail is None:
+        return write_error(None, "Activity response was not a JSON object.")
+    try:
+        messages = _all_messages(activity_id)
+    except ApiError as exc:
+        return write_error(exc.status, exc.detail)
+    document = _export_markdown(detail, messages)
+    if out_path is None:
+        print(document, end="")
+        return 0
+    try:
+        _ = Path(out_path).write_text(document, encoding="utf-8")
+    except OSError as exc:
+        return write_error(None, f"Could not write the export: {exc.strerror or exc}.")
+    print(f"已写入 {out_path}")
     return 0
 
 
@@ -228,6 +254,131 @@ def _print_stats(stats: JsonObject | None) -> None:
     print(f"语音 {stats.get('voice_count')}")
     print(f"文字 {stats.get('text_count')}")
     print(f"系统异常 {stats.get('system_error_count')}")
+
+
+def _all_messages(activity_id: int) -> list[JsonObject]:
+    collected: list[JsonObject] = []
+    offset = 0
+    while True:
+        _status, payload = _request(
+            "GET",
+            f"/api/v1/me/activities/{activity_id}/messages",
+            params={"limit": _EXPORT_PAGE_SIZE, "offset": offset},
+        )
+        body = _dict(payload)
+        rows = body.get("messages") if body is not None else None
+        if not isinstance(rows, list):
+            raise ApiError(None, "Activity messages were not a JSON object.")
+        page: list[JsonObject] = []
+        for item in cast(list[object], rows):
+            row = _dict(item)
+            if row is not None:
+                page.append(row)
+        collected.extend(page)
+        if len(page) < _EXPORT_PAGE_SIZE:
+            return collected
+        offset += len(page)
+
+
+def _export_markdown(activity: JsonObject, messages: list[JsonObject]) -> str:
+    title = _text(activity.get("title")) or f"课程 {activity.get('id')}"
+    lines = [f"# {title}", ""]
+    lines.extend(_export_facts(activity))
+    lines.extend(["", "## 统计", "", _export_stats(activity), "", "## 点评", ""])
+    lines.append(_export_evaluation(activity))
+    lines.extend(["", "## 对话", ""])
+    if not messages:
+        lines.append("无对话。")
+    else:
+        rendered = [_export_message(index, row) for index, row in enumerate(messages, start=1)]
+        lines.append("\n\n".join(rendered))
+    return "\n".join(lines) + "\n"
+
+
+def _export_facts(activity: JsonObject) -> list[str]:
+    facts = [
+        f"- 课程：{activity.get('id')}",
+        f"- 用户：{activity.get('user_id')}",
+        f"- 状态：{activity.get('status')}",
+        f"- 模式：{activity.get('mode')}",
+    ]
+    plan_type = _text(activity.get("plan_type"))
+    if plan_type is not None:
+        facts.append(f"- 学案类型：{plan_type}")
+    created = _text(activity.get("date_created"))
+    updated = _text(activity.get("date_updated"))
+    if created is not None:
+        facts.append(f"- 创建：{created}")
+    if updated is not None:
+        facts.append(f"- 更新：{updated}")
+    return facts
+
+
+def _export_stats(activity: JsonObject) -> str:
+    stats = _dict(activity.get("stats")) or {}
+    return (
+        f"消息 {stats.get('message_count', activity.get('message_count'))}，"
+        f"笔迹 {stats.get('pen_count', 0)}，"
+        f"语音 {stats.get('voice_count', 0)}，"
+        f"文字 {stats.get('text_count', 0)}，"
+        f"系统异常 {stats.get('system_error_count', 0)}"
+    )
+
+
+def _export_evaluation(activity: JsonObject) -> str:
+    evaluation = _dict(activity.get("evaluation"))
+    if evaluation is None:
+        return "无点评。"
+    parts: list[str] = []
+    summary = evaluation.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        parts.append(summary.strip())
+    error = _text(evaluation.get("error_msg"))
+    if error is not None:
+        parts.append(f"错误：{error}")
+    if not parts:
+        return "无点评。"
+    return "\n\n".join(parts)
+
+
+def _export_message(index: int, row: JsonObject) -> str:
+    kind = row.get("input_type")
+    label = _INPUT_LABELS.get(kind, "未知") if isinstance(kind, str) else "未知"
+    if row.get("system_error") is True:
+        label = f"{label} 系统异常"
+    created = _text(row.get("date_created"))
+    heading = f"### {index}. {created} {label}" if created is not None else f"### {index}. {label}"
+    blocks = [heading]
+    query = _text(row.get("query"))
+    if query is not None:
+        blocks.append(f"学生：{query}")
+    answer = _text(row.get("answer"))
+    if answer is not None:
+        blocks.append(f"老师：{answer}")
+    pen = _export_pen(row.get("pen"))
+    if pen:
+        blocks.append(pen)
+    return "\n\n".join(blocks)
+
+
+def _export_pen(value: object) -> str:
+    if not isinstance(value, list):
+        return ""
+    lines: list[str] = []
+    for item in cast(list[object], value):
+        stroke = _dict(item)
+        if stroke is None:
+            continue
+        images = stroke.get("image_urls")
+        urls = [url for url in cast(list[object], images) if isinstance(url, str)] if isinstance(images, list) else []
+        lines.append(f"笔迹 {stroke.get('point_count')} 点 {' '.join(urls)}".rstrip())
+    return "\n".join(lines)
+
+
+def _text(value: object) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def _print_messages(payload: object) -> None:

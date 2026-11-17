@@ -106,6 +106,24 @@ linkseed activities show 210 --messages --offset 20
 linkseed activities show 210 --messages --json
 ```
 
+要把一门课收成一份完整的 Markdown，用 `export`。它和 `show` 看的是同一门课，但用途不同：`show` 在终端里翻看，对话默认只显示前 20 条，状态和对话要分两次看；`export` 自动翻完所有对话，和状态、统计、点评写在同一份里，适合保存或转给别人。
+
+```bash
+linkseed activities export 210
+linkseed activities export 210 --out 210.md
+```
+
+不写 `--out` 时，Markdown 直接出现在终端里。写了 `--out` 时，内容进文件，终端只提示写入了哪个文件。
+
+这份文件包含：
+
+- 标题，以及课程编号、用户、状态、模式、学案类型、创建和更新时间
+- 统计：消息、笔迹、语音、文字、系统异常
+- 点评正文。没有点评时写「无点评。」生成失败时多一行错误说明
+- 全部对话，按时间从早到晚。每条有时间、语音 / 笔迹 / 文字，学生说的话和老师的回复。笔迹只保留点数和图片地址
+
+文件里没有笔迹坐标，也没有用量和内部诊断信息。要看坐标，仍用 `show 210 --messages --json`。
+
 生成或重新生成点评：
 
 ```bash
@@ -120,7 +138,40 @@ linkseed activities evaluation generate 12
 linkseed activities evaluation edit 12 --file 点评.md
 ```
 
-也可以把文字从管道传进去。管理员账号可以查看其他用户的活动，例如 `linkseed activities list --user-id 7`。生成和修改点评仍然只能针对自己的活动。
+也可以把文字从管道传进去。管理员账号可以查看、生成和修改其他用户的活动，例如 `linkseed activities list --user-id 7`，然后对其中一门课执行 `evaluation generate` 或 `evaluation edit`。
+
+## 从题目图片建课
+
+先识别题目，确认之后再创建课程。识别不会创建课程。
+
+```bash
+linkseed course snap 题目.jpg --out question.json
+linkseed course create --question-file question.json --course-mode teaching
+```
+
+把 `--course-mode` 换成 `tutoring` 就是辅导课。不写这个参数时按讲解课创建。讲解课还可以加 `--teaching-mode voice_only` 或 `voice_pen`；辅导课固定使用 `voice_pen`。
+
+`snap` 会印出题干、公式、选项和图片地址。几何图看你提交的本地图片，以及摘要里的附件地址。觉得识别不对，就不要执行 `create`。要改识别结果，直接编辑 `question.json` 再创建。
+
+在终端里也可以一次做完。程序会先问你是否创建：
+
+```bash
+linkseed course snap 题目.jpg --out question.json --create --course-mode teaching
+```
+
+已经有学案时，用学案编号开课。练习学案可以选辅导课。微课学案只开讲解课。
+
+```bash
+linkseed course create --learning-plan-id 88
+```
+
+重学会保留原来的课，并新开一门：
+
+```bash
+linkseed course relearn 172
+```
+
+创建或重学成功后，用印出的课程编号在 App 里打开这门课。这个编号也是 `linkseed activities show` 使用的编号。
 
 ## 登录信息存在哪里
 
@@ -131,6 +182,6 @@ linkseed activities evaluation edit 12 --file 点评.md
 
 ## 命令执行失败时
 
-失败时，终端的错误输出是一行说明，例如 `{"status": 401, "detail": "Invalid username or password."}`。`401` 表示用户名、密码或访问令牌不正确，或登录已经失效。`404` 表示活动或用户不存在，或者这门活动不属于当前账号。`409` 或 `422` 表示这次操作冲突或内容不符合要求，例如一个后台账号对应了多个用户，或点评需要先刷新再保存。
+失败时，终端的错误输出是一行说明，例如 `{"status": 401, "detail": "Invalid username or password."}`。`401` 表示用户名、密码或访问令牌不正确，或登录已经失效。`404` 表示活动或用户不存在，或者这门活动不属于当前账号。`403`、`409` 或 `422` 表示这次操作被拒绝、发生冲突，或内容不符合要求，例如课程不属于当前账号、一个后台账号对应了多个用户，或点评需要先刷新再保存。
 
-程序的退出码：成功是 `0`；用户名、密码或令牌被拒绝是 `2`；找不到活动或用户是 `3`；操作冲突或内容不符合要求是 `4`；其他失败是 `1`。
+程序的退出码：成功是 `0`；用户名、密码或令牌被拒绝是 `2`；找不到活动或用户是 `3`；操作被拒绝、冲突或内容不符合要求是 `4`；其他失败是 `1`。

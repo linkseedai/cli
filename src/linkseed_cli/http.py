@@ -12,6 +12,8 @@ import httpx
 
 JsonObject = dict[str, object]
 QueryParams = Mapping[str, str | int | Sequence[str]]
+DEFAULT_TIMEOUT_SECONDS = 30.0
+LONG_RUNNING_TIMEOUT_SECONDS = 300.0
 
 
 class ApiError(Exception):
@@ -26,8 +28,9 @@ class ApiError(Exception):
         self.detail = detail
 
 
-def http_client() -> httpx.Client:
-    return httpx.Client(timeout=httpx.Timeout(30.0), trust_env=True, follow_redirects=False)
+def http_client(*, timeout: float | None = None) -> httpx.Client:
+    seconds = DEFAULT_TIMEOUT_SECONDS if timeout is None else timeout
+    return httpx.Client(timeout=httpx.Timeout(seconds), trust_env=True, follow_redirects=False)
 
 
 def write_error(status: int | None, detail: str, *, reason: str | None = None) -> int:
@@ -51,6 +54,7 @@ def request_json(
     token: str | None = None,
     body: JsonObject | None = None,
     params: QueryParams | None = None,
+    timeout: float | None = None,
 ) -> tuple[int, object]:
     """Call the API and return the status code and JSON body. Errors raise `ApiError`."""
     _require_https_for_remote(base_url)
@@ -58,7 +62,7 @@ def request_json(
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
-        with http_client() as client:
+        with _open_client(timeout) as client:
             response = client.request(
                 method,
                 base_url.rstrip("/") + path,
@@ -68,6 +72,47 @@ def request_json(
             )
     except httpx.HTTPError as exc:
         raise ApiError(None, "Could not reach the API.") from exc
+    return _interpret(response)
+
+
+def request_multipart(
+    method: str,
+    base_url: str,
+    path: str,
+    *,
+    token: str | None,
+    file_field: str,
+    filename: str,
+    content: bytes,
+    content_type: str,
+    timeout: float,
+) -> tuple[int, object]:
+    """Upload one file and return the status code and JSON body. Errors raise `ApiError`."""
+    _require_https_for_remote(base_url)
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    files = {file_field: (filename, content, content_type)}
+    try:
+        with _open_client(timeout) as client:
+            response = client.request(
+                method,
+                base_url.rstrip("/") + path,
+                headers=headers,
+                files=files,
+            )
+    except httpx.HTTPError as exc:
+        raise ApiError(None, "Could not reach the API.") from exc
+    return _interpret(response)
+
+
+def _open_client(timeout: float | None) -> httpx.Client:
+    if timeout is None:
+        return http_client()
+    return http_client(timeout=timeout)
+
+
+def _interpret(response: httpx.Response) -> tuple[int, object]:
     payload = _payload(response)
     if response.status_code >= 400:
         raise ApiError(response.status_code, _detail(payload))
@@ -90,7 +135,7 @@ def _exit_code(status: int | None) -> int:
         return 2
     if status == 404:
         return 3
-    if status in {409, 422}:
+    if status in {403, 409, 422}:
         return 4
     return 1
 
