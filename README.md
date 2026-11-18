@@ -26,6 +26,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ## 登录
 
+### 使用账号或 Directus Token 登录
+
 服务地址以 `https://` 开头。用账号登录时不要把密码写在命令里，终端会单独询问，输入时不会显示：
 
 ```bash
@@ -59,7 +61,7 @@ linkseed auth login --base-url https://linkseedapi.lessonian.com --directus-toke
 
 第一次登录之后，同一台电脑上可以省略 `--base-url`。
 
-## 查看当前登录
+### 查看当前登录
 
 ```bash
 linkseed auth whoami
@@ -67,7 +69,7 @@ linkseed auth whoami
 
 这条命令不会把登录凭证打印出来。
 
-## 退出登录
+### 退出登录
 
 ```bash
 linkseed auth logout
@@ -75,7 +77,29 @@ linkseed auth logout
 
 退出后，这台电脑上的 linkseed 不再保持登录。服务地址会留下来，下次登录可以继续用。
 
-## 查看学习活动
+## 使用 LinkSeed CLI
+
+下表是全部命令。`< >` 里换成你自己的值。后面各节有完整说明。
+
+| 命令 | 作用 |
+| --- | --- |
+| `linkseed auth login --username <用户名>` | 用账号登录。密码会单独询问。第一次还要加 `--base-url <地址>`。 |
+| `linkseed auth login --directus-token` | 用后台访问令牌登录。令牌会单独询问。 |
+| `linkseed auth whoami` | 查看当前登录的用户。不打印登录凭证。 |
+| `linkseed auth logout` | 退出这台电脑上的登录。服务地址会保留。 |
+| `linkseed activities list` | 列出学习活动。可按状态、模式、计划类型、关键词和更新时间筛选。 |
+| `linkseed activities show <编号>` | 查看状态、点评和消息统计。加 `--messages` 看对话，再加 `--json` 可看笔迹坐标。 |
+| `linkseed activities export <编号>` | 把这门课收成一份完整 Markdown。加 `--out <文件>` 则写入文件。 |
+| `linkseed activities evaluation generate <编号>` | 生成或重新生成点评，并等到完成。加 `--no-wait` 则只提交、不等待。 |
+| `linkseed activities evaluation edit <编号> --file <文件>` | 用文件里的文字修改已发布的点评。也可以从管道读入文字。 |
+| `linkseed course snap <图片>` | 识别题目图片，不创建课程。`--out <文件>` 保存结果，`--create` 会在确认后建课。 |
+| `linkseed course create --question-file <文件>` | 用识别结果建课。`--course-mode teaching` 是讲解课，`tutoring` 是辅导课。 |
+| `linkseed course create --learning-plan-id <编号>` | 用已有学案开课。练习学案可选辅导课，微课学案只开讲解课。 |
+| `linkseed course relearn <课程编号>` | 保留原来的课，并新开一门。 |
+
+学习活动和建课命令需要先登录。除 `activities export` 外，这些命令都可以加 `--json`。管理员查看别人的活动时，在 `linkseed activities list` 后面加 `--user-id <用户编号>`。
+
+### 查看学习活动
 
 登录之后可以查看自己的学习活动。活动编号在列表的第一列。
 
@@ -140,7 +164,7 @@ linkseed activities evaluation edit 12 --file 点评.md
 
 也可以把文字从管道传进去。管理员账号可以查看、生成和修改其他用户的活动，例如 `linkseed activities list --user-id 7`，然后对其中一门课执行 `evaluation generate` 或 `evaluation edit`。
 
-## 从题目图片建课
+### 从题目图片建课
 
 先识别题目，确认之后再创建课程。识别不会创建课程。
 
@@ -173,14 +197,14 @@ linkseed course relearn 172
 
 创建或重学成功后，用印出的课程编号在 App 里打开这门课。这个编号也是 `linkseed activities show` 使用的编号。
 
-## 登录信息存在哪里
+### 登录信息存在哪里
 
 请不要把这个文件发给别人，也不要把它放到网盘或聊天里。
 
 - macOS：`/Users/你的用户名/.config/linkseed/config.toml`
 - Windows：`C:\Users\你的用户名\.config\linkseed\config.toml`
 
-## 命令执行失败时
+### 命令执行失败时
 
 失败时，终端的错误输出是一行说明，例如 `{"status": 401, "detail": "Invalid username or password."}`。`401` 表示用户名、密码或访问令牌不正确，或登录已经失效。`404` 表示活动或用户不存在，或者这门活动不属于当前账号。`403`、`409` 或 `422` 表示这次操作被拒绝、发生冲突，或内容不符合要求，例如课程不属于当前账号、一个后台账号对应了多个用户，或点评需要先刷新再保存。
 
